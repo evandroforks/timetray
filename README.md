@@ -11,6 +11,10 @@ jar tf TimeTray.jar - to see jar contents
 
 java -jar .\TimeTray.jar - to execute jar file
 
+%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup - create shortcup to starup here
+
+Shortcup target = "C:\Program Files\Java\jdk-12.0.1\bin\javaw.exe" -jar "C:\WeekNum\TimeTray.jar"
+
 ## Install/Usage
 If you don't use the "Download ZIP" option but only want to download _TimeTray.jar_, **don't right-click it in the list (!) but left-click on it and get the "RAW" version**!
 
