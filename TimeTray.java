@@ -402,7 +402,9 @@ public class TimeTray extends TimerTask implements ActionListener {
 
             offsetSlider = createOffsetSlider(this);
 
-            this.setTitle("Presets (not finished)");
+            this.getContentPane().setPreferredSize(new Dimension(1000,100));
+
+            this.setTitle("Adjust week to Semester week");
             this.getContentPane().add(sliderLabel);
             this.getContentPane().add(Box.createRigidArea(
                 new Dimension(0, 5)));
@@ -419,7 +421,7 @@ public class TimeTray extends TimerTask implements ActionListener {
          */
         private JSlider createOffsetSlider(SettingsWindow window) {
             JSlider offsetSlider = new JSlider(
-                JSlider.HORIZONTAL, -1,
+                JSlider.HORIZONTAL, -40,
                 1,
                 window.parent.presets.offset);
             offsetSlider.setAlignmentX(Component.LEFT_ALIGNMENT);
