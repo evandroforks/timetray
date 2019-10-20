@@ -2,10 +2,11 @@
 TimeTray displays the current calender week in a system tray
 
 ## How to build your own Jar file
-edit TimeTray.java
-rm -rf *.class *.jar
-javac TimeTray.java
-jar -cmf TimeTray.mf TimeTray.jar *.class
+Make your required edits to the TimeTray.java file then run the following commands:
+
+- rm -rf *.class *.jar
+- javac TimeTray.java
+- jar -cmf TimeTray.mf TimeTray.jar *.class
 
 jar tf TimeTray.jar - to see jar contents
 
