@@ -107,6 +107,7 @@ public class TimeTray extends TimerTask implements ActionListener {
         presets = new Presets(iconSize.height);
 
         calendar = Calendar.getInstance();
+        calendar.setFirstDayOfWeek(Calendar.MONDAY);
 
         // create TrayIcon according to iconSize
         trayIcon = new TrayIcon(getTrayImage(), "TimeTray", menu);
