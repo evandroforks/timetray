@@ -26,7 +26,7 @@ Go to:
 
 Create shortcup to starup here
 
-Shortcup target = "C:\Program Files\Java\jdk-12.0.1\bin\javaw.exe" -jar "C:\WeekNum\TimeTray.jar"
+Shortcup target = "C:\Program Files\OpenJDK\jdk-13.0.1\bin\javaw.exe" -jar "C:\WeekNum\TimeTray.jar"
 
 Place your new TimeTray.jar in C:\WeekNum\
 ## Install/Usage
