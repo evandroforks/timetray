@@ -1,16 +1,23 @@
 # TimeTray
-TimeTray displays the current calender week in a system tray
+TimeTray displays the current calendar week in a system tray
 
 ## How to build your own Jar file
-Make your required edits to the TimeTray.java file then run the following commands:
+Make your required edits to the TimeTray.java file.
+Run the following commands to build the new jar file:
 
-- rm -rf *.class *.jar
-- javac TimeTray.java
-- jar -cmf TimeTray.mf TimeTray.jar *.class
+rm -rf *.class *.jar
 
-jar tf TimeTray.jar - to see jar contents
+javac TimeTray.java
 
-java -jar .\TimeTray.jar - to execute jar file
+jar -cmf TimeTray.mf TimeTray.jar *.class
+
+Run the following commands to see the jar file contents:
+
+jar tf TimeTray.jar
+
+Run the following commands to execute the jar file contents:
+
+java -jar .\TimeTray.jar
 
 ## How to add to windows startup
 Go to:
