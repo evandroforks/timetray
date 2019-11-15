@@ -108,7 +108,7 @@ public class TimeTray extends TimerTask implements ActionListener {
 
         calendar = Calendar.getInstance();
         calendar.setFirstDayOfWeek(Calendar.MONDAY); // added by me not sure if needed.
-        
+
         // create TrayIcon according to iconSize
         trayIcon = new TrayIcon(getTrayImage(), "TimeTray", menu);
         try {
@@ -130,8 +130,8 @@ public class TimeTray extends TimerTask implements ActionListener {
     public void run() {
         // get current date and time and set ToolTipText accordingly
         calendar = Calendar.getInstance();
-        calendar.setFirstDayOfWeek(Calendar.MONDAY); // added by me
-        
+        calendar.setFirstDayOfWeek(Calendar.SUNDAY); // added by me
+
         trayIcon.setToolTip(
             "week " +
             getWeekNumber() + ", " +
@@ -182,7 +182,8 @@ public class TimeTray extends TimerTask implements ActionListener {
      * @return int the current week number
      */
     private int getWeekNumber() {
-        return this.calendar.get(Calendar.WEEK_OF_YEAR) + this.presets.offset;
+        return this.calendar.get(Calendar.DAY_OF_MONTH);
+        // return this.calendar.get(Calendar.WEEK_OF_YEAR) + this.presets.offset;
     }
 
     /**
