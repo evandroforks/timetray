@@ -1,9 +1,34 @@
 # TimeTray
-TimeTray displays the current calender week in a system tray -- a feature that Windows still lacks in 2016.
+TimeTray displays the current calendar week in a system tray
 
-## Support me at patreon!
-If you like what I do, please consider to become my supporter at patreon: https://www.patreon.com/otacke
+## How to build your own Jar file
+Make your required edits to the TimeTray.java file.
+Run the following commands to build the new jar file:
 
+rm -rf *.class *.jar
+
+javac TimeTray.java
+
+jar -cmf TimeTray.mf TimeTray.jar *.class
+
+Run the following commands to see the jar file contents:
+
+jar tf TimeTray.jar
+
+Run the following commands to execute the jar file contents:
+
+java -jar .\TimeTray.jar
+
+## How to add to windows startup
+Go to:
+
+%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup
+
+Create shortcup to starup here
+
+Shortcup target = "C:\Program Files\OpenJDK\jdk-13.0.1\bin\javaw.exe" -jar "C:\WeekNum\TimeTray.jar"
+
+Place your new TimeTray.jar in C:\WeekNum\
 ## Install/Usage
 If you don't use the "Download ZIP" option but only want to download _TimeTray.jar_, **don't right-click it in the list (!) but left-click on it and get the "RAW" version**!
 
@@ -41,5 +66,3 @@ The load and save routines are only rudimentary, so you might crash TimeTray if 
 
 _When will all this be done? When it's done. But to be honest: I don't care much about this piece of code that's probably mainly used for Windows. Sorry! But you may use the source, Luke!_
 
-## License
-TimeTray is licensed under the [DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE](http://www.wtfpl.net).

@@ -107,7 +107,8 @@ public class TimeTray extends TimerTask implements ActionListener {
         presets = new Presets(iconSize.height);
 
         calendar = Calendar.getInstance();
-
+        calendar.setFirstDayOfWeek(Calendar.MONDAY); // added by me not sure if needed.
+        
         // create TrayIcon according to iconSize
         trayIcon = new TrayIcon(getTrayImage(), "TimeTray", menu);
         try {
@@ -129,7 +130,8 @@ public class TimeTray extends TimerTask implements ActionListener {
     public void run() {
         // get current date and time and set ToolTipText accordingly
         calendar = Calendar.getInstance();
-
+        calendar.setFirstDayOfWeek(Calendar.MONDAY); // added by me
+        
         trayIcon.setToolTip(
             "week " +
             getWeekNumber() + ", " +
@@ -158,18 +160,15 @@ public class TimeTray extends TimerTask implements ActionListener {
         g2.setColor(presets.backgroundColor);
         g2.fillRect(0, 0, iconSize.width, iconSize.height);
 
-        // draw number
+        // Draw number
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
             RenderingHints.VALUE_ANTIALIAS_ON);
         g2.setColor(presets.fontColor);
         g2.setFont(presets.font);
         FontMetrics fm = g2.getFontMetrics(presets.font);
-        int fontWidth = fm.stringWidth(
-            String.valueOf(getWeekNumber()));
-        g2.drawString(
-            String.valueOf(getWeekNumber()), (iconSize.width - fontWidth) / 2,
-            iconSize.height - 3);
-
+        int fontWidth = fm.stringWidth(String.valueOf(getWeekNumber()));
+        g2.drawString(String.valueOf(getWeekNumber()),
+        		(iconSize.width - fontWidth) / 2, iconSize.height - 3);
         return image;
     }
 
@@ -402,7 +401,9 @@ public class TimeTray extends TimerTask implements ActionListener {
 
             offsetSlider = createOffsetSlider(this);
 
-            this.setTitle("Presets (not finished)");
+            this.getContentPane().setPreferredSize(new Dimension(1000,100));
+
+            this.setTitle("Adjust week to Semester week");
             this.getContentPane().add(sliderLabel);
             this.getContentPane().add(Box.createRigidArea(
                 new Dimension(0, 5)));
@@ -419,7 +420,7 @@ public class TimeTray extends TimerTask implements ActionListener {
          */
         private JSlider createOffsetSlider(SettingsWindow window) {
             JSlider offsetSlider = new JSlider(
-                JSlider.HORIZONTAL, -1,
+                JSlider.HORIZONTAL, -40,
                 1,
                 window.parent.presets.offset);
             offsetSlider.setAlignmentX(Component.LEFT_ALIGNMENT);
