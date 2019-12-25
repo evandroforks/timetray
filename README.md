@@ -5,6 +5,7 @@ TimeTray displays the current calendar week in a system tray
 ## Python version
 
 To run the Python version, just create a shortcut to you python interpreter:
+1. `python3 -m pip install -r requirements.txt`
 1. `"F:\Python\pythonw.exe" "D:\User\timetray\TimeTray.py"`
 1. https://stackoverflow.com/questions/9705982/pythonw-exe-or-python-exe
 
