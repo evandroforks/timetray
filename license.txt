@@ -3,8 +3,8 @@ License
 All files distributed are licensed under this:
 
 Date Time Tray application
-Copyright (C) 2019 Evandro Coan <https://github.com/evandrocoan>
 Copyright (C) 2004 Sam Hocevar <sam@hocevar.net>
+Copyright (C) 2019 Evandro Coan <https://github.com/evandrocoan>
 
 Redistributions of source code must retain the above
 copyright notice, this list of conditions and the
