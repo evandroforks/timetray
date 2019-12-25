@@ -1,41 +1,46 @@
 # TimeTray
 TimeTray displays the current calendar week in a system tray
 
+
+## Python version
+
+To run the Python version, just create a shortcut to you python interpreter:
+1. `"F:\Python\pythonw.exe" "D:\User\timetray\TimeTray.py"`
+1. https://stackoverflow.com/questions/9705982/pythonw-exe-or-python-exe
+
+
 ## How to build your own Jar file
 Make your required edits to the TimeTray.java file.
 Run the following commands to build the new jar file:
-
-rm -rf *.class *.jar
-
-javac TimeTray.java
-
-jar -cmf TimeTray.mf TimeTray.jar *.class
+1. `rm -rf *.class *.jar`
+1. `javac TimeTray.java`
+1. `jar -cmf TimeTray.mf TimeTray.jar *.class`
 
 Run the following commands to see the jar file contents:
-
-jar tf TimeTray.jar
+1. `jar tf TimeTray.jar`
 
 Run the following commands to execute the jar file contents:
+1. `java -jar .\TimeTray.jar`
 
-java -jar .\TimeTray.jar
 
 ## How to add to windows startup
 Go to:
+1. `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup`
+1. Create shortcup to starup here
+1. `Shortcup target = "C:\Program Files\OpenJDK\jdk-13.0.1\bin\javaw.exe" -jar "C:\WeekNum\TimeTray.jar"`
+1. `Place your new TimeTray.jar in C:\WeekNum\`
 
-%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup
 
-Create shortcup to starup here
-
-Shortcup target = "C:\Program Files\OpenJDK\jdk-13.0.1\bin\javaw.exe" -jar "C:\WeekNum\TimeTray.jar"
-
-Place your new TimeTray.jar in C:\WeekNum\
 ## Install/Usage
+
 If you don't use the "Download ZIP" option but only want to download _TimeTray.jar_, **don't right-click it in the list (!) but left-click on it and get the "RAW" version**!
 
 Just make sure that you're running a Java Runtime Environment (e. g. the [JRE from Oracle](http://www.java.com/en/download/ "Oracle")), and put _TimeTray.jar_ into your autostart folder, crontab, whatever...
 
+
 ## Screenshot
 ![timetray](https://github.com/otacke/timetray/blob/master/timetray.png "timetray")
+
 
 ## Additional Information
 TimeTray is a very simple program that I originally hacked on one day for a former colleague of mine many years ago. It displays the current calender week in a system tray -- a feature that Windows still lacks in 2016. Since TimeTray is written in Java, it can run on other operating systems as well, e.g. Linux or MacOS.
