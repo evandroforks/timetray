@@ -4,9 +4,6 @@ import time
 import datetime
 import threading
 
-# https://stackoverflow.com/questions/19723459/why-is-python-deque-initialized-using-the-last-maxlen-items-in-an-iterable
-from collections import deque
-
 # https://python-catalin.blogspot.com/2018/11/python-qt5-tray-icon-example.html
 # https://stackoverflow.com/questions/6389580/quick-and-easy-trayicon-with-python
 # https://stackoverflow.com/questions/2430877/how-to-save-a-qpixmap-object-to-a-file
@@ -61,8 +58,18 @@ class QSystemTrayIconListener(QSystemTrayIcon):
         pixmap = QPixmap(100,100)
         pixmap.fill( Qt.GlobalColor.transparent )
 
+        # QFont::Thin
+        # QFont::ExtraLight
+        # QFont::Light
+        # QFont::Normal
+        # QFont::Medium
+        # QFont::DemiBold
+        # QFont::Bold
+        # QFont::ExtraBold
+        # QFont::Black
+        # https://doc.qt.io/qt-5/qfont.html#Weight-enum
         font = QFont( "SansSerif" )
-        font.setWeight( QFont.Medium )
+        font.setWeight( QFont.Thin )
         font.setPointSize( 73 )
 
         painter = QPainter( pixmap )
@@ -76,6 +83,7 @@ class QSystemTrayIconListener(QSystemTrayIcon):
 
         icon = QIcon( pixmap )
         self.setIcon( icon )
+        self.setToolTip( str( datetime.datetime.now() )[:-7] )
         self.setVisible( True )
 
         if self.painter:
@@ -89,11 +97,6 @@ class QSystemTrayIconListener(QSystemTrayIcon):
     def create_menu(self):
         # create the menu for tray icon
         self.menu = QMenu()
-
-        # add one item to menu
-        self.action = QAction( "This is menu item" )
-        self.menu.addAction( self.action )
-        self.action.triggered.connect( self.print_msg )
 
         # add exit item to menu
         self.exitAction = QAction( "&Exit" )
