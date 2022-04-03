@@ -84,6 +84,7 @@ speech.Speak "{text}"
         threading.Timer( 10, os.unlink, args=(filename) )
 
 
+# Copied python implementation to Start it as a daemon to not block qt from exiting!
 class Timer(threading.Thread):
     """Call a function after a specified number of seconds:
             t = Timer(30.0, f, args=None, kwargs=None)
@@ -110,7 +111,7 @@ class Timer(threading.Thread):
 
 
 class MainWindow(QMainWindow):
-    run_next_timeloop = pyqtSignal( [] )
+    runEyeRestLoop = pyqtSignal( [] )
 
     def __init__(self):
         QMainWindow.__init__(self)
@@ -130,43 +131,46 @@ class MainWindow(QMainWindow):
         self.resize(self.settings.value("size", QSize(400, 500)))
         self.move(self.settings.value("pos", QPoint(50, 50)))
 
+        self.eyeRestCounterSetup()
+
+    def eyeRestCounterSetup(self):
         # https://www.geeksforgeeks.org/pyqt5-digital-stopwatch/
-        self.time_counter = 0
-        self.is_to_increment_counter = False
-        self.label = QLabel(self)
-        self.label.setGeometry(75, 100, 250, 70)
+        self.eyeRestCounterValue = 0
+        self.incrementEyeRestCounter = False
 
-        self.label.setStyleSheet("border : 4px solid black;")
-        self.label.setText(str(self.time_counter))
-        self.label.setFont(QFont('Arial', 25))
-        self.label.setAlignment(Qt.AlignCenter)
+        self.eyeRestCounterLabel = QLabel(self)
+        self.eyeRestCounterLabel.setGeometry(75, 100, 250, 70)
+        self.eyeRestCounterLabel.setStyleSheet("border : 4px solid black;")
+        self.eyeRestCounterLabel.setText(str(self.eyeRestCounterValue))
+        self.eyeRestCounterLabel.setFont(QFont('Arial', 25))
+        self.eyeRestCounterLabel.setAlignment(Qt.AlignCenter)
 
-        start = QPushButton("Start", self)
-        start.setGeometry(125, 250, 150, 40)
-        start.pressed.connect(self.Start)
+        startEyeRestButton = QPushButton("Start Eye Rest", self)
+        startEyeRestButton.setGeometry(125, 250, 150, 40)
+        startEyeRestButton.pressed.connect(self.startEyeRest)
 
-        pause = QPushButton("Pause", self)
-        pause.setGeometry(125, 300, 150, 40)
-        pause.pressed.connect(self.Pause)
+        pauseEyeRestButton = QPushButton("Pause Eye Rest", self)
+        pauseEyeRestButton.setGeometry(125, 300, 150, 40)
+        pauseEyeRestButton.pressed.connect(self.pauseEyeRest)
 
-        reset = QPushButton("Reset", self)
-        reset.setGeometry(125, 350, 150, 40)
-        reset.pressed.connect(self.Re_set)
+        resetEyeRestButton = QPushButton("Reset Eye Rest", self)
+        resetEyeRestButton.setGeometry(125, 350, 150, 40)
+        resetEyeRestButton.pressed.connect(self.resetEyeRest)
 
-        timer = QTimer(self)
-        timer.timeout.connect(self.updateTime)
-        timer.start(1000)
-        self.is_playing = False
+        timerEyeRest = QTimer(self)
+        timerEyeRest.timeout.connect(self.updateTime)
+        timerEyeRest.start(1000)
+        self.isEyeRestPlaying = False
 
     def connectTray(self):
-        self.run_next_timeloop.connect( mainTray.next_timeloop )
-        self.run_next_timeloop.emit()
+        self.runEyeRestLoop.connect( mainTray.nextEyeRestLoop )
+        self.runEyeRestLoop.emit()
 
     def clickMethod(self):
         QMessageBox.about(self, "Title", "Message")
 
     def closeEvent(self, event):
-        self.run_next_timeloop.emit()
+        self.runEyeRestLoop.emit()
         event.accept()
 
     def showUp(self):
@@ -180,11 +184,11 @@ class MainWindow(QMainWindow):
         exit()
 
     def updateTime(self):
-        seconds = self.time_counter
-        if self.is_to_increment_counter:
-            self.time_counter+= 1
-            if seconds > ALARM_TIMEOUT and not self.is_playing:
-                self.is_playing = True
+        seconds = self.eyeRestCounterValue
+        if self.incrementEyeRestCounter:
+            self.eyeRestCounterValue+= 1
+            if seconds > ALARM_TIMEOUT and not self.isEyeRestPlaying:
+                self.isEyeRestPlaying = True
                 filename = os.path.join(CURRENT_DIR, "Alarm06.wav")
                 QtMultimedia.QSound.play(filename)
             if seconds == 10:
@@ -193,65 +197,65 @@ class MainWindow(QMainWindow):
                 speak(f"{seconds} seconds")
             if seconds == 30:
                 speak(f"{seconds} seconds")
-            self.label.setText(str(seconds))
+            self.eyeRestCounterLabel.setText(str(seconds))
 
-    def Start(self):
-        self.is_to_increment_counter = True
-        self.label.setStyleSheet("background-color:lightgreen")
+    def startEyeRest(self):
+        self.incrementEyeRestCounter = True
+        self.eyeRestCounterLabel.setStyleSheet("background-color:lightgreen")
 
-    def Pause(self):
-        self.is_to_increment_counter = False
-        self.label.setStyleSheet("background-color:lightblue")
+    def pauseEyeRest(self):
+        self.incrementEyeRestCounter = False
+        self.eyeRestCounterLabel.setStyleSheet("background-color:lightblue")
 
-    def Re_set(self):
-        self.is_playing = False
-        self.time_counter = 0
-        self.label.setText(str(self.time_counter))
+    def resetEyeRest(self):
+        self.isEyeRestPlaying = False
+        self.eyeRestCounterValue = 0
+        self.eyeRestCounterLabel.setText(str(self.eyeRestCounterValue))
 
-        if self.is_to_increment_counter:
-            self.label.setStyleSheet("background-color:lightgreen")
+        if self.incrementEyeRestCounter:
+            self.eyeRestCounterLabel.setStyleSheet("background-color:lightgreen")
         else:
-            self.label.setStyleSheet("background-color:")
+            self.eyeRestCounterLabel.setStyleSheet("background-color:")
 
 
 class QSystemTrayIconListener(QSystemTrayIcon):
-    update_tray_icon_text = pyqtSignal( [str] )
-    show_main_window = pyqtSignal( [] )
+    updateTrayIconText = pyqtSignal( [] )
+    showMainWindow = pyqtSignal( [] )
 
     def __init__(self, *args, **kwargs):
-        self.pixmap = None
-        self.font = None
-        self.painter = None
-        self.icon = None
+        self.trayIconPixmap = None
+        self.trayIconFont = None
+        self.trayIconPainter = None
+        self.trayIcon = None
         super(QSystemTrayIconListener, self).__init__( *args, **kwargs )
 
-        self.create_menu()
-        self.set_tray_text( "00" )
+        self.createTrayMenu()
+        self.setTrayText()
 
-        self.update_tray_icon_text.connect( self.set_tray_text )
-        self.show_main_window.connect( mainWin.show )
+        self.updateTrayIconText.connect( self.setTrayText )
+        self.showMainWindow.connect( mainWin.show )
 
-        threading.Thread( target=self.continually_update_tray_icon, daemon=True ).start()
+        threading.Thread( target=self.continuallyUpdateTrayIcon, daemon=True ).start()
 
-    def next_timeloop(self):
-        timer = Timer( SHOW_WINDOW_INTERVAL, self.show_main_window.emit )
+    def nextEyeRestLoop(self):
+        timer = Timer( SHOW_WINDOW_INTERVAL, self.showMainWindow.emit )
         timer.start()
         # last_show_up = datetime.datetime.now().date()
         # while True:
         #     now = datetime.datetime.now().date()
         #     if now - last_show_up > datetime.timedelta(minutes=30):
         #         last_show_up = now
-        #         self.show_main_window.emit()
+        #         self.showMainWindow.emit()
 
-    def continually_update_tray_icon(self):
+    def continuallyUpdateTrayIcon(self):
         while True:
-            now = datetime.datetime.now().date()
-            self.update_tray_icon_text.emit( "%02d" % now.day )
-            time.sleep(30)
+            self.updateTrayIconText.emit()
+            time.sleep(1)
 
-    def set_tray_text(self, newdate):
-        pixmap = QPixmap(100,100)
-        pixmap.fill( Qt.GlobalColor.transparent )
+    def setTrayText(self):
+        timenow = datetime.datetime.now()
+        trayIconPixmap = QPixmap(100,100)
+        trayIconPixmap.fill( Qt.GlobalColor.transparent )
 
         # QFont::Thin
         # QFont::ExtraLight
@@ -263,55 +267,52 @@ class QSystemTrayIconListener(QSystemTrayIcon):
         # QFont::ExtraBold
         # QFont::Black
         # https://doc.qt.io/qt-5/qfont.html#Weight-enum
-        font = QFont( "SansSerif" )
-        font.setWeight( QFont.Thin )
-        font.setPointSize( 73 )
+        trayIconFont = QFont( "SansSerif" )
+        trayIconFont.setWeight( QFont.Thin )
+        trayIconFont.setPointSize( 73 )
 
-        painter = QPainter( pixmap )
-        painter.setPen( Qt.white )
-        painter.setFont( font )
-        painter.drawText( QPoint( -5, 79 ), newdate )
+        trayIconPainter = QPainter( trayIconPixmap )
+        trayIconPainter.setPen( Qt.white )
+        trayIconPainter.setFont( trayIconFont )
+        trayIconPainter.drawText( QPoint( -5, 79 ), "%02d" % timenow.date().day )
 
         # file = QFile( "yourFile.png" )
         # file.open( QIODevice.WriteOnly )
-        # pixmap.save( file, "PNG" )
+        # trayIconPixmap.save( file, "PNG" )
 
-        icon = QIcon( pixmap )
-        self.setIcon( icon )
-        self.setToolTip( str( datetime.datetime.now() )[:-7] )
+        trayIcon = QIcon( trayIconPixmap )
+        self.setIcon( trayIcon )
+        self.setToolTip( str( timenow )[:-7] )
         self.setVisible( True )
 
-        if self.painter:
-            self.painter.end()
+        if self.trayIconPainter:
+            self.trayIconPainter.end()
 
-        self.pixmap = pixmap
-        self.font = font
-        self.painter = painter
-        self.icon = icon
+        self.trayIconPixmap = trayIconPixmap
+        self.trayIconFont = trayIconFont
+        self.trayIconPainter = trayIconPainter
+        self.trayIcon = trayIcon
 
-    def create_menu(self):
+    def createTrayMenu(self):
         self.exitAction = QAction( "&Exit" )
         self.mainWindowAction = QAction( "&Main Window" )
 
-        self.menu = QMenu()
-        self.menu.addAction( self.mainWindowAction )
-        self.menu.addAction( self.exitAction )
+        self.trayMenu = QMenu()
+        self.trayMenu.addAction( self.mainWindowAction )
+        self.trayMenu.addAction( self.exitAction )
 
         self.mainWindowAction.triggered.connect( mainWin.showUp )
         self.exitAction.triggered.connect( mainWin.exitApplication )
-        self.setContextMenu( self.menu )
+        self.setContextMenu( self.trayMenu )
 
-        self.activated.connect(self.systemIcon)
+        self.activated.connect(self.systemIconClick)
 
-    def systemIcon(self, reason):
+    def systemIconClick(self, reason):
         if reason == QSystemTrayIcon.Trigger:
             if mainWin.isVisible():
                 mainWin.hide()
             else:
                 mainWin.showUp()
-
-    def print_msg(self):
-        print( "This action is triggered connect!" )
 
 
 if __name__ == "__main__":
