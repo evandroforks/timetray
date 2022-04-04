@@ -229,6 +229,7 @@ class QSystemTrayIconListener(QSystemTrayIcon):
         self.trayIcon = None
         super(QSystemTrayIconListener, self).__init__( *args, **kwargs )
 
+        self.eyeRestTimer = None
         self.createTrayMenu()
         self.setTrayText()
 
@@ -238,8 +239,11 @@ class QSystemTrayIconListener(QSystemTrayIcon):
         threading.Thread( target=self.continuallyUpdateTrayIcon, daemon=True ).start()
 
     def nextEyeRestLoop(self):
-        timer = Timer( SHOW_WINDOW_INTERVAL, self.showMainWindow.emit )
-        timer.start()
+        if self.eyeRestTimer:
+            self.eyeRestTimer.cancel()
+
+        self.eyeRestTimer = Timer( SHOW_WINDOW_INTERVAL, self.showMainWindow.emit )
+        self.eyeRestTimer.start()
         # last_show_up = datetime.datetime.now().date()
         # while True:
         #     now = datetime.datetime.now().date()
