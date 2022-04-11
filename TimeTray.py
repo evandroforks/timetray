@@ -173,6 +173,12 @@ class MainWindow(QMainWindow):
         self.runEyeRestLoop.emit()
         event.accept()
 
+    def keyPressEvent(self, event):
+        if event.key() == QtCore.Qt.Key_Escape:
+            self.close()
+        if event.key() in ( QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
+            self.resetEyeRest()
+
     def showUp(self):
         self.show()
         self.raise_()
