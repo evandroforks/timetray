@@ -30,7 +30,7 @@ from PyQt5.QtWidgets import QMessageBox, QPushButton, QMainWindow, QLabel, QGrid
 
 CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
 
-ALARM_TIMEOUT = 40
+ALARM_TIMEOUT = 4  # * 10
 SHOW_WINDOW_INTERVAL = 1800
 # ALARM_TIMEOUT = 2
 # SHOW_WINDOW_INTERVAL = 2
@@ -80,7 +80,9 @@ speech.Volume = 100
 
 speech.Speak "{text}"
     """) as filename:
-        subprocess.Popen(f'wscript "{filename}"')
+        a = subprocess.Popen(f'wscript "{filename}"')
+        ar = a.communicate()
+        # print('ar {ar}.')
         threading.Timer( 10, os.unlink, args=(filename) )
 
 
@@ -190,19 +192,33 @@ class MainWindow(QMainWindow):
         exit()
 
     def updateTime(self):
+        testtime = 10
+        # testtime = 1
         seconds = self.eyeRestCounterValue
         if self.incrementEyeRestCounter:
             self.eyeRestCounterValue+= 1
-            if seconds > ALARM_TIMEOUT and not self.isEyeRestPlaying:
+            if seconds > int(ALARM_TIMEOUT * testtime) and not self.isEyeRestPlaying:
                 self.isEyeRestPlaying = True
                 filename = os.path.join(CURRENT_DIR, "Alarm06.wav")
                 QtMultimedia.QSound.play(filename)
-            if seconds == 10:
+            if seconds == int(0.1 * testtime):
+                a = subprocess.Popen(r'''"D:\\User\Documents\\NirSoft\SoundVolumeView.exe" /ChangeVolume "AIMP3" -75''')
+                b = subprocess.Popen(r'''"D:\\User\Documents\\NirSoft\SoundVolumeView.exe" /ChangeVolume "Speakers" "+50"''')
+                ar = a.communicate()
+                br = b.communicate()
+                # print(f"ar {ar}, br {br}.")
+            if seconds == int(1.0 * testtime):
                 speak(f"{seconds} seconds")
-            if seconds == 20:
+            if seconds == int(2.0 * testtime):
                 speak(f"{seconds} seconds")
-            if seconds == 30:
+            if seconds == int(3.0 * testtime):
                 speak(f"{seconds} seconds")
+            if seconds == int(4.6 * testtime):
+                a = subprocess.Popen(r'''"D:\\User\Documents\\NirSoft\SoundVolumeView.exe" /ChangeVolume "Speakers" "-50"''')
+                b = subprocess.Popen(r'''"D:\User\Documents\NirSoft\SoundVolumeView.exe" /ChangeVolume "AIMP3" "+75"''')
+                ar = a.communicate()
+                br = b.communicate()
+                # print(f"ar {ar}, br {br}.")
             self.eyeRestCounterLabel.setText(str(seconds))
 
     def startEyeRest(self):
@@ -248,8 +264,9 @@ class QSystemTrayIconListener(QSystemTrayIcon):
         if self.eyeRestTimer:
             self.eyeRestTimer.cancel()
 
-        self.eyeRestTimer = Timer( SHOW_WINDOW_INTERVAL, self.showMainWindow.emit )
-        self.eyeRestTimer.start()
+        if mainWin.incrementEyeRestCounter:
+            self.eyeRestTimer = Timer( SHOW_WINDOW_INTERVAL, self.showMainWindow.emit )
+            self.eyeRestTimer.start()
         # last_show_up = datetime.datetime.now().date()
         # while True:
         #     now = datetime.datetime.now().date()
