@@ -5,10 +5,24 @@ import sys
 import time
 import tempfile
 
+import argparse
 import pathlib
 import subprocess
 import datetime
 import threading
+
+import pytest
+from pytest import approx
+
+# Python 3.8.1
+# PyQt5
+# python -m pip install pycaw pytest
+# https://stackoverflow.com/questions/53026985/the-ordinal-242-could-not-be-located-in-the-dynamic-link-library-anaconda3-libra
+os.environ["PATH"] = f'F:\\Python\\Library\\bin;{os.environ["PATH"]}'
+
+from ctypes import cast, POINTER
+from comtypes import CLSCTX_ALL
+from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
 
 # https://python-catalin.blogspot.com/2018/11/python-qt5-tray-icon-example.html
 # https://stackoverflow.com/questions/6389580/quick-and-easy-trayicon-with-python
@@ -35,8 +49,31 @@ SHOW_WINDOW_INTERVAL = 1800
 # ALARM_TIMEOUT = 2
 # SHOW_WINDOW_INTERVAL = 2
 
+g_setVolumeBase = """
+import sys
+import time
+
+from ctypes import cast, POINTER
+from comtypes import CLSCTX_ALL
+from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
+
+devices = AudioUtilities.GetSpeakers()
+interface = devices.Activate(
+    IAudioEndpointVolume._iid_, CLSCTX_ALL, None
+)"""
 
 def main():
+    argumentsNamespace = g_argumentParser.parse_args()
+
+    run_tests = argumentsNamespace.run_tests
+    if isinstance(run_tests, list):
+        args = [sys.argv[0], '-vv', '-rP']
+        if run_tests:
+            args.append(f"-k {' '.join(run_tests)}")
+        print(f'Running tests {args}')
+        pytest.main(args)
+        return
+
     app = QApplication( [] )
     app.setQuitOnLastWindowClosed( False )
 
@@ -82,8 +119,85 @@ speech.Speak "{text}"
     """) as filename:
         a = subprocess.Popen(f'wscript "{filename}"')
         ar = a.communicate()
-        # print('ar {ar}.')
+        # print(f'ar {ar}.')
         threading.Timer( 10, os.unlink, args=(filename) )
+
+
+def runpython(text):
+    with TemporaryFileContent(text) as filename:
+        process = subprocess.Popen(f'python "{filename}"', stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        stdout, stderr = process.communicate()
+        stdout = stdout.decode("UTF-8", errors='replace').replace('\r\n', '\n').rstrip(' \n\r')
+        threading.Timer( 1, os.unlink, args=(filename) )
+        stderr = stderr.decode("UTF-8", errors='replace').replace('\r\n', '\n').rstrip(' \n\r')
+        assert process.returncode == 0, f"process.returncode {process.returncode}, {stderr}, {stdout}."
+        if stderr:
+            print(stderr, file=sys.stderr)
+        return stdout
+
+
+def getSystemVolume():
+    result = runpython(f"""
+{g_setVolumeBase}
+volume = cast(interface, POINTER(IAudioEndpointVolume))
+print(volume.GetMasterVolumeLevelScalar())
+        """
+    )
+    return float(result)
+
+
+def test_get_system_volume():
+    assert type(getSystemVolume()) == float
+
+
+def setSystemVolume(endVolume):
+    result = runpython(f"""
+{g_setVolumeBase}
+systemVolume = cast(interface, POINTER(IAudioEndpointVolume))
+startVolume = int(systemVolume.GetMasterVolumeLevelScalar() * 100)
+endVolume = int({endVolume} * 100)
+for volume in range(startVolume, endVolume, 5):
+    # print(f'volume {{volume}}.', file=sys.stderr)
+    systemVolume.SetMasterVolumeLevelScalar(volume/100, None)
+    time.sleep(0.1)
+systemVolume.SetMasterVolumeLevelScalar({endVolume}, None)
+print(systemVolume.GetMasterVolumeLevelScalar())
+        """
+    )
+    return float(result)
+
+
+def test_get_system_volume():
+    level = 0.20
+    assert setSystemVolume(level) == approx(level)
+
+
+def setApplicationVolume(endVolume, processName):
+    result = runpython(f"""
+{g_setVolumeBase}
+sessions = AudioUtilities.GetAllSessions()
+for session in sessions:
+    if session.Process and session.Process.name() == "{processName}":
+        volumeDevice = session.SimpleAudioVolume
+        # print(f"{{session.Process.name()}} volumeDevice.GetMute(): {{volumeDevice.GetMute()}}, volume {{volumeDevice.GetMasterVolume()}}.", file=sys.stderr)
+        startVolume = int(volumeDevice.GetMasterVolume() * 100)
+        endVolume = int({endVolume} * 100)
+        for volume in range(startVolume, endVolume, 10):
+            # print(f'volume {{volume}}.', file=sys.stderr)
+            volumeDevice.SetMasterVolume(volume/100, None)
+            time.sleep(0.1)
+        volumeDevice.SetMasterVolume({endVolume}, None)
+        print(volumeDevice.GetMasterVolume())
+        """
+    )
+    return float(result)
+
+
+def test_set_application_volume():
+    level = 0.2
+    assert setApplicationVolume(level, "AIMP.exe") == approx(level)
+    level = 1
+    assert setApplicationVolume(level, "AIMP.exe") == approx(level)
 
 
 # Copied python implementation to Start it as a daemon to not block qt from exiting!
@@ -139,6 +253,7 @@ class MainWindow(QMainWindow):
         # https://www.geeksforgeeks.org/pyqt5-digital-stopwatch/
         self.eyeRestCounterValue = 0
         self.incrementEyeRestCounter = False
+        self.defaultSystemVolume = None
 
         self.eyeRestCounterLabel = QLabel(self)
         self.eyeRestCounterLabel.setGeometry(75, 100, 250, 70)
@@ -202,11 +317,14 @@ class MainWindow(QMainWindow):
                 filename = os.path.join(CURRENT_DIR, "Alarm06.wav")
                 QtMultimedia.QSound.play(filename)
             if seconds == int(0.1 * testtime):
-                a = subprocess.Popen(r'''"D:\\User\Documents\\NirSoft\SoundVolumeView.exe" /ChangeVolume "AIMP3" -75''')
-                b = subprocess.Popen(r'''"D:\\User\Documents\\NirSoft\SoundVolumeView.exe" /ChangeVolume "Speakers" "+50"''')
-                ar = a.communicate()
-                br = b.communicate()
-                # print(f"ar {ar}, br {br}.")
+                self.defaultSystemVolume = getSystemVolume()
+                setApplicationVolume(self.defaultSystemVolume * 0.7, "AIMP.exe")
+                setSystemVolume(self.defaultSystemVolume + 0.5)
+                # a = subprocess.Popen(r'''"D:\\User\Documents\\NirSoft\SoundVolumeView.exe" /ChangeVolume "AIMP3" -75''')
+                # b = subprocess.Popen(r'''"D:\\User\Documents\\NirSoft\SoundVolumeView.exe" /ChangeVolume "Speakers" "+50"''')
+                # ar = a.communicate()
+                # br = b.communicate()
+                # # print(f"ar {ar}, br {br}.")
             if seconds == int(1.0 * testtime):
                 speak(f"{seconds} seconds")
             if seconds == int(2.0 * testtime):
@@ -214,11 +332,13 @@ class MainWindow(QMainWindow):
             if seconds == int(3.0 * testtime):
                 speak(f"{seconds} seconds")
             if seconds == int(4.6 * testtime):
-                a = subprocess.Popen(r'''"D:\\User\Documents\\NirSoft\SoundVolumeView.exe" /ChangeVolume "Speakers" "-50"''')
-                b = subprocess.Popen(r'''"D:\User\Documents\NirSoft\SoundVolumeView.exe" /ChangeVolume "AIMP3" "+75"''')
-                ar = a.communicate()
-                br = b.communicate()
-                # print(f"ar {ar}, br {br}.")
+                setSystemVolume(self.defaultSystemVolume)
+                setApplicationVolume(1, "AIMP.exe")
+                # a = subprocess.Popen(r'''"D:\\User\Documents\\NirSoft\SoundVolumeView.exe" /ChangeVolume "Speakers" "-50"''')
+                # b = subprocess.Popen(r'''"D:\User\Documents\NirSoft\SoundVolumeView.exe" /ChangeVolume "AIMP3" "+75"''')
+                # ar = a.communicate()
+                # br = b.communicate()
+                # # print(f"ar {ar}, br {br}.")
             self.eyeRestCounterLabel.setText(str(seconds))
 
     def startEyeRest(self):
@@ -341,6 +461,27 @@ class QSystemTrayIconListener(QSystemTrayIcon):
             else:
                 mainWin.showUp()
 
+
+g_argumentParser = argparse.ArgumentParser(
+        description = \
+"""
+Show the time as a tray icon.
+""",
+        formatter_class=argparse.RawTextHelpFormatter,
+        add_help=False,
+    )
+
+# https://stackoverflow.com/questions/35847084/customize-argparse-help-message
+g_argumentParser.add_argument( "-h", "--help", action="store_true",
+help= """
+Show this help message and exit.
+""" )
+
+g_argumentParser.add_argument( "-t", "--run-tests", action="store", nargs='*', default=None,
+        help=
+"""
+Run tests instead of the main application. Accepts a pytest test filter to pass to -k pytest option.
+""" )
 
 if __name__ == "__main__":
     main()
