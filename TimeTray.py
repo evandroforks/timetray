@@ -250,18 +250,8 @@ def test_set_application_volume():
 
 def setSystemAndApplicationVolume(systemVolume: Number, applicationVolume: Number, applicationName: str):
     result = runpython(f"""
-import sys
-import time
+{g_setVolumeBase}
 from itertools import zip_longest
-
-from ctypes import cast, POINTER
-from comtypes import CLSCTX_ALL
-from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
-
-devices = AudioUtilities.GetSpeakers()
-interface = devices.Activate(
-    IAudioEndpointVolume._iid_, CLSCTX_ALL, None
-)
 
 systemVolume = {systemVolume}
 applicationName = "{applicationName}"

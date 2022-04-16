@@ -9,6 +9,10 @@ To run the Python version, just create a shortcut to you python interpreter:
 1. `"F:\Python\pythonw.exe" "D:\User\timetray\TimeTray.py"`
 1. https://stackoverflow.com/questions/9705982/pythonw-exe-or-python-exe
 
+### Python volume mixing
+
+![volume mixing](volumemixing.gif)
+
 
 ## How to build your own Jar file
 Make your required edits to the TimeTray.java file.
