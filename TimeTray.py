@@ -6,6 +6,7 @@ import time
 import tempfile
 
 import argparse
+import shlex
 import pathlib
 import subprocess
 import datetime
@@ -20,6 +21,7 @@ from pytest import approx
 # https://stackoverflow.com/questions/53026985/the-ordinal-242-could-not-be-located-in-the-dynamic-link-library-anaconda3-libra
 os.environ["PATH"] = f'F:\\Python\\Library\\bin;{os.environ["PATH"]}'
 
+from numbers import Number
 from ctypes import cast, POINTER
 from comtypes import CLSCTX_ALL
 from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
@@ -67,7 +69,7 @@ def main():
 
     run_tests = argumentsNamespace.run_tests
     if isinstance(run_tests, list):
-        args = [sys.argv[0], '-vv', '-rP']
+        args = [sys.argv[0], '-vv', '-rP', '--capture=no']
         if run_tests:
             args.append(f"-k {' '.join(run_tests)}")
         print(f'Running tests {args}')
@@ -123,16 +125,60 @@ speech.Speak "{text}"
         threading.Timer( 10, os.unlink, args=(filename) )
 
 
+def run_process(command_line, directory=None, verbose=False):
+    """ https://gist.github.com/evandrocoan/916976490aeecc7b93e658084bb2834d """
+    stdout_lines = []
+    stderr_lines = []
+    command = shlex.split(command_line)
+
+    if verbose:
+        print('run_process command', command, directory, file=sys.stderr)
+
+    with subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        cwd=directory,
+        shell=True,
+    ) as process:
+        def capturestderr():
+            while True:
+                line = process.stderr.readline()
+                if not line:
+                    break
+                line = line.decode("UTF-8", errors='replace')
+                line = line.replace('\r\n', '\n').rstrip(' \n\r')
+                stderr_lines.append(line)
+
+                if verbose:
+                    print(line, file=sys.stderr)
+
+        thread = threading.Thread(target=capturestderr, daemon=True)
+        thread.start()
+
+        while True:
+            line = process.stdout.readline()
+            if not line:
+                break
+
+            line = line.decode("UTF-8", errors='replace')
+            line = line.replace('\r\n', '\n').rstrip(' \n\r')
+            stdout_lines.append(line)
+
+            if verbose:
+                print(line, file=sys.stderr)
+
+        thread.join()
+
+    return process, stdout_lines, stderr_lines
+
+
 def runpython(text):
     with TemporaryFileContent(text) as filename:
-        process = subprocess.Popen(f'python "{filename}"', stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-        stdout, stderr = process.communicate()
-        stdout = stdout.decode("UTF-8", errors='replace').replace('\r\n', '\n').rstrip(' \n\r')
-        threading.Timer( 1, os.unlink, args=(filename) )
-        stderr = stderr.decode("UTF-8", errors='replace').replace('\r\n', '\n').rstrip(' \n\r')
-        assert process.returncode == 0, f"process.returncode {process.returncode}, {stderr}, {stdout}."
-        if stderr:
-            print(stderr, file=sys.stderr)
+        process, stdout, stderr = run_process(f'python -u "{filename}"', verbose=0)
+        stdout = "\n".join(stdout)
+        stderr = "\n".join(stderr)
+        assert process.returncode == 0, f"process.returncode {process.returncode}, {stdout}, {stderr}."
         return stdout
 
 
@@ -167,9 +213,11 @@ print(systemVolume.GetMasterVolumeLevelScalar())
     return float(result)
 
 
-def test_get_system_volume():
+def test_set_system_volume():
     level = 0.20
+    defaultSystemVolume = getSystemVolume()
     assert setSystemVolume(level) == approx(level)
+    assert setSystemVolume(defaultSystemVolume) == approx(defaultSystemVolume)
 
 
 def setApplicationVolume(endVolume, processName):
@@ -198,6 +246,100 @@ def test_set_application_volume():
     assert setApplicationVolume(level, "AIMP.exe") == approx(level)
     level = 1
     assert setApplicationVolume(level, "AIMP.exe") == approx(level)
+
+
+def setSystemAndApplicationVolume(systemVolume: Number, applicationVolume: Number, applicationName: str):
+    result = runpython(f"""
+import sys
+import time
+from itertools import zip_longest
+
+from ctypes import cast, POINTER
+from comtypes import CLSCTX_ALL
+from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
+
+devices = AudioUtilities.GetSpeakers()
+interface = devices.Activate(
+    IAudioEndpointVolume._iid_, CLSCTX_ALL, None
+)
+
+systemVolume = {systemVolume}
+applicationName = "{applicationName}"
+applicationVolume = {applicationVolume}
+
+# https://stackoverflow.com/questions/5389507/iterating-over-every-two-elements-in-a-list
+def pairwise(iterable):
+    "s -> (s0, s1), (s2, s3), (s4, s5), ..."
+    a = iter(iterable)
+    return zip(a, a)
+
+# https://stackoverflow.com/questions/3678869/pythonic-way-to-combine-two-lists-in-an-alternating-fashion
+# merge("abc", "lmn1234", "xyz9", [None])
+# ['a', 'l', 'x', None, 'b', 'm', 'y', 'c', 'n', 'z', '1', '9', '2', '3', '4']
+def combineListAlternating(*iterators):
+    return [
+        element for inner_list in zip_longest(*iterators, fillvalue=object)
+        for element in inner_list if element is not object
+    ]
+
+sessions = AudioUtilities.GetAllSessions()
+for session in sessions:
+    if session.Process: print(applicationName, file=sys.stderr)
+    if session.Process and session.Process.name() == applicationName:
+        isIncreasingApplicationVolume = applicationVolume == 1
+        volumeDevice = session.SimpleAudioVolume
+        # print(f"{{{{session.Process.name()}}}} volumeDevice.GetMute(): {{{{volumeDevice.GetMute()}}}}, volume {{{{volumeDevice.GetMasterVolume()}}}}.", file=sys.stderr)
+        startApplicationVolume = int(volumeDevice.GetMasterVolume() * 100)
+        endApplicationVolume = int(applicationVolume * 100)
+        stepApplication = 5 if isIncreasingApplicationVolume else 20
+        stepApplication = stepApplication * (1 if startApplicationVolume < endApplicationVolume else -1)
+        rangeApplication = range(startApplicationVolume, endApplicationVolume, stepApplication)
+        applicationRangeFull = []
+        for volume in rangeApplication:
+            applicationRangeFull.append((volume, 'application'))
+
+        devices = AudioUtilities.GetSpeakers()
+        interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+        systemDevice = cast(interface, POINTER(IAudioEndpointVolume))
+        startSystemVolume = int(systemDevice.GetMasterVolumeLevelScalar() * 100)
+        endSystemVolume = int(systemVolume * 100)
+        stepSystem = 15 if isIncreasingApplicationVolume else 20
+        stepSystem = 5 * (1 if startSystemVolume < endSystemVolume else -1)
+        rangeSystem = range(startSystemVolume, endSystemVolume, stepSystem)
+        systemRangeFull = []
+        for volume in rangeSystem:
+            systemRangeFull.append((volume, 'system'))
+
+        shuffledRange = combineListAlternating(applicationRangeFull, systemRangeFull)
+        for items in pairwise(shuffledRange):
+            # print(f'shuffledRange {{{{items}}}}.', file=sys.stderr)
+            lastType = None
+            for volume, soundType in items:
+                if soundType == 'system':
+                    # print(f'system volume {{{{volume}}}}.', file=sys.stderr)
+                    systemDevice.SetMasterVolumeLevelScalar(volume/100, None)
+                elif soundType == 'application':
+                    # print(f'application volume {{{{volume}}}}.', file=sys.stderr)
+                    volumeDevice.SetMasterVolume(volume/100, None)
+                if lastType == soundType:
+                    time.sleep(0.1)
+                lastType = soundType
+            time.sleep(0.1)
+
+        volumeDevice.SetMasterVolume(applicationVolume, None)
+        systemDevice.SetMasterVolumeLevelScalar(systemVolume, None)
+        print(volumeDevice.GetMasterVolume())
+        print(systemDevice.GetMasterVolumeLevelScalar())
+        break
+""".format())
+    return result
+
+
+def test_set_volume_evenly():
+    defaultSystemVolume = getSystemVolume()
+    setSystemAndApplicationVolume(defaultSystemVolume + 0.5, defaultSystemVolume * 0.7, "AIMP.exe")
+    time.sleep(2)
+    setSystemAndApplicationVolume(defaultSystemVolume, 1, "AIMP.exe")
 
 
 # Copied python implementation to Start it as a daemon to not block qt from exiting!
@@ -318,22 +460,22 @@ class MainWindow(QMainWindow):
                 QtMultimedia.QSound.play(filename)
             if seconds == int(0.1 * testtime):
                 self.defaultSystemVolume = getSystemVolume()
-                setApplicationVolume(self.defaultSystemVolume * 0.7, "AIMP.exe")
-                setSystemVolume(self.defaultSystemVolume + 0.5)
+                threading.Thread(target=setSystemAndApplicationVolume, 
+                    args=(self.defaultSystemVolume + 0.5, self.defaultSystemVolume * 0.7, "AIMP.exe"), daemon=True).start()
                 # a = subprocess.Popen(r'''"D:\\User\Documents\\NirSoft\SoundVolumeView.exe" /ChangeVolume "AIMP3" -75''')
                 # b = subprocess.Popen(r'''"D:\\User\Documents\\NirSoft\SoundVolumeView.exe" /ChangeVolume "Speakers" "+50"''')
                 # ar = a.communicate()
                 # br = b.communicate()
                 # # print(f"ar {ar}, br {br}.")
             if seconds == int(1.0 * testtime):
-                speak(f"{seconds} seconds")
+                threading.Thread(target=speak, args=(f"{seconds} seconds",), daemon=True).start()
             if seconds == int(2.0 * testtime):
-                speak(f"{seconds} seconds")
+                threading.Thread(target=speak, args=(f"{seconds} seconds",), daemon=True).start()
             if seconds == int(3.0 * testtime):
-                speak(f"{seconds} seconds")
+                threading.Thread(target=speak, args=(f"{seconds} seconds",), daemon=True).start()
             if seconds == int(4.6 * testtime):
-                setSystemVolume(self.defaultSystemVolume)
-                setApplicationVolume(1, "AIMP.exe")
+                threading.Thread(target=setSystemAndApplicationVolume, 
+                    args=(self.defaultSystemVolume, 1.0, "AIMP.exe"), daemon=True).start()
                 # a = subprocess.Popen(r'''"D:\\User\Documents\\NirSoft\SoundVolumeView.exe" /ChangeVolume "Speakers" "-50"''')
                 # b = subprocess.Popen(r'''"D:\User\Documents\NirSoft\SoundVolumeView.exe" /ChangeVolume "AIMP3" "+75"''')
                 # ar = a.communicate()
@@ -468,14 +610,7 @@ g_argumentParser = argparse.ArgumentParser(
 Show the time as a tray icon.
 """,
         formatter_class=argparse.RawTextHelpFormatter,
-        add_help=False,
     )
-
-# https://stackoverflow.com/questions/35847084/customize-argparse-help-message
-g_argumentParser.add_argument( "-h", "--help", action="store_true",
-help= """
-Show this help message and exit.
-""" )
 
 g_argumentParser.add_argument( "-t", "--run-tests", action="store", nargs='*', default=None,
         help=
