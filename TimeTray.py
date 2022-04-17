@@ -44,6 +44,7 @@ from PyQt5 import QtGui, QtCore, QtWidgets, QtMultimedia
 from PyQt5.QtCore import QSize, QSettings
 from PyQt5.QtWidgets import QMessageBox, QPushButton, QMainWindow, QLabel, QGridLayout, QWidget
 
+g_run_tests = [False]
 CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 ALARM_TIMEOUT = 4  # * 10
@@ -66,10 +67,10 @@ interface = devices.Activate(
 
 def main():
     argumentsNamespace = g_argumentParser.parse_args()
-
     run_tests = argumentsNamespace.run_tests
+
     if isinstance(run_tests, list):
-        args = [sys.argv[0], '-vv', '-rP', '--capture=no']
+        args = [sys.argv[0], '-vvv', '-rP', '--capture=no']
         if run_tests:
             args.append(f"-k {' '.join(run_tests)}")
         print(f'Running tests {args}')
@@ -87,6 +88,11 @@ def main():
 
     mainWin.connectTray()
     app.exec_()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def enable_verbose(request):
+    g_run_tests[0] = request.config.getoption("--verbose")
 
 
 class TemporaryFileContent:
@@ -175,7 +181,7 @@ def run_process(command_line, directory=None, verbose=False):
 
 def runpython(text):
     with TemporaryFileContent(text) as filename:
-        process, stdout, stderr = run_process(f'python -u "{filename}"', verbose=0)
+        process, stdout, stderr = run_process(f'python -u "{filename}"', verbose=g_run_tests[0])
         stdout = "\n".join(stdout)
         stderr = "\n".join(stderr)
         assert process.returncode == 0, f"process.returncode {process.returncode}, {stdout}, {stderr}."
