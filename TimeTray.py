@@ -4,6 +4,7 @@ import os
 import sys
 import time
 import tempfile
+import math
 
 import argparse
 import shlex
@@ -13,6 +14,7 @@ import datetime
 import threading
 
 import pytest
+import inspect
 from pytest import approx
 
 # Python 3.8.1
@@ -254,76 +256,42 @@ def test_set_application_volume():
     assert setApplicationVolume(level, "AIMP.exe") == approx(level)
 
 
-def setSystemAndApplicationVolume(systemVolume: Number, applicationVolume: Number, applicationName: str):
+def setSystemAndApplicationVolume(defaultSystemVolume, volumeIncrease, applicationName, reverse=False):
     result = runpython(f"""
 {g_setVolumeBase}
+import math
 from itertools import zip_longest
 
-systemVolume = {systemVolume}
+defaultSystemVolume = {defaultSystemVolume}
+volumeIncrease = {volumeIncrease}
 applicationName = "{applicationName}"
-applicationVolume = {applicationVolume}
+reverse = {reverse}
 
-# https://stackoverflow.com/questions/5389507/iterating-over-every-two-elements-in-a-list
-def pairwise(iterable):
-    "s -> (s0, s1), (s2, s3), (s4, s5), ..."
-    a = iter(iterable)
-    return zip(a, a)
-
-# https://stackoverflow.com/questions/3678869/pythonic-way-to-combine-two-lists-in-an-alternating-fashion
-# merge("abc", "lmn1234", "xyz9", [None])
-# ['a', 'l', 'x', None, 'b', 'm', 'y', 'c', 'n', 'z', '1', '9', '2', '3', '4']
-def combineListAlternating(*iterators):
-    return [
-        element for inner_list in zip_longest(*iterators, fillvalue=object)
-        for element in inner_list if element is not object
-    ]
+{inspect.getsource(volumeConversion)}
 
 sessions = AudioUtilities.GetAllSessions()
 for session in sessions:
-    if session.Process: print(applicationName, file=sys.stderr)
+    # print(f"{{{{session.Process.name() if session.Process else session.Process}}}} volumeDevice.GetMute(): {{{{volumeDevice.GetMute()}}}}, volume {{{{volumeDevice.GetMasterVolume()}}}}.", file=sys.stderr)
     if session.Process and session.Process.name() == applicationName:
-        isIncreasingApplicationVolume = applicationVolume == 1
         volumeDevice = session.SimpleAudioVolume
-        # print(f"{{{{session.Process.name()}}}} volumeDevice.GetMute(): {{{{volumeDevice.GetMute()}}}}, volume {{{{volumeDevice.GetMasterVolume()}}}}.", file=sys.stderr)
-        startApplicationVolume = int(volumeDevice.GetMasterVolume() * 100)
-        endApplicationVolume = int(applicationVolume * 100)
-        stepApplication = 5 if isIncreasingApplicationVolume else 20
-        stepApplication = stepApplication * (1 if startApplicationVolume < endApplicationVolume else -1)
-        rangeApplication = range(startApplicationVolume, endApplicationVolume, stepApplication)
-        applicationRangeFull = []
-        for volume in rangeApplication:
-            applicationRangeFull.append((volume, 'application'))
-
         devices = AudioUtilities.GetSpeakers()
         interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
         systemDevice = cast(interface, POINTER(IAudioEndpointVolume))
-        startSystemVolume = int(systemDevice.GetMasterVolumeLevelScalar() * 100)
-        endSystemVolume = int(systemVolume * 100)
-        stepSystem = 15 if isIncreasingApplicationVolume else 20
-        stepSystem = 5 * (1 if startSystemVolume < endSystemVolume else -1)
-        rangeSystem = range(startSystemVolume, endSystemVolume, stepSystem)
-        systemRangeFull = []
-        for volume in rangeSystem:
-            systemRangeFull.append((volume, 'system'))
+        systemRangeFull = volumeConversion(defaultSystemVolume, volumeIncrease, 0.3)
 
-        shuffledRange = combineListAlternating(applicationRangeFull, systemRangeFull)
-        for items in pairwise(shuffledRange):
-            # print(f'shuffledRange {{{{items}}}}.', file=sys.stderr)
-            lastType = None
-            for volume, soundType in items:
-                if soundType == 'system':
-                    # print(f'system volume {{{{volume}}}}.', file=sys.stderr)
-                    systemDevice.SetMasterVolumeLevelScalar(volume/100, None)
-                elif soundType == 'application':
-                    # print(f'application volume {{{{volume}}}}.', file=sys.stderr)
-                    volumeDevice.SetMasterVolume(volume/100, None)
-                if lastType == soundType:
-                    time.sleep(0.1)
-                lastType = soundType
+        if reverse:
+            systemRangeFull = list(reversed(systemRangeFull))
+
+        for systemVolume, applicationVolume in systemRangeFull:
+            # print(f'systemVolume {{{{systemVolume:.2f}}}}, applicationVolume {{{{applicationVolume:.2f}}}}.', file=sys.stderr)
+            if reverse:
+                volumeDevice.SetMasterVolume(applicationVolume/100, None)
+                systemDevice.SetMasterVolumeLevelScalar(systemVolume/100, None)
+            else:
+                systemDevice.SetMasterVolumeLevelScalar(systemVolume/100, None)
+                volumeDevice.SetMasterVolume(applicationVolume/100, None)
             time.sleep(0.1)
 
-        volumeDevice.SetMasterVolume(applicationVolume, None)
-        systemDevice.SetMasterVolumeLevelScalar(systemVolume, None)
         print(volumeDevice.GetMasterVolume())
         print(systemDevice.GetMasterVolumeLevelScalar())
         break
@@ -333,9 +301,144 @@ for session in sessions:
 
 def test_set_volume_evenly():
     defaultSystemVolume = getSystemVolume()
-    setSystemAndApplicationVolume(defaultSystemVolume + 0.5, defaultSystemVolume * 0.7, "AIMP.exe")
+    setSystemAndApplicationVolume(defaultSystemVolume, 0.5, "AIMP.exe")
     time.sleep(2)
-    setSystemAndApplicationVolume(defaultSystemVolume, 1, "AIMP.exe")
+    setSystemAndApplicationVolume(defaultSystemVolume, 0.5, "AIMP.exe", reverse=True)
+
+
+def volumeConversion(defaultSystemVolume, volumeIncrease, factor):
+    # https://en.wikipedia.org/wiki/Sigmoid_function
+    # https://www.desmos.com/calculator/lew1cvqu91
+    def sigmoid(number):
+        number = number
+        reverse = abs(number - 100)
+        extra = math.sin( number / 100 + 1.5 ) - 0.6
+        # print("extra %s, reverse %s." % (extra, reverse), file=sys.stderr)
+        extra = extra if extra > 0 and factor else 0
+        number = number + reverse * factor - extra * 100
+        if number > 100: return 100
+        return int(number * 100) / 100
+
+    def ceiling(number):
+        if number > 100: return 100
+        return int(number * 100) / 100
+
+    stepSystem = 500
+    startSystemVolume = int(defaultSystemVolume * 10_000)
+    endSystemVolume = int((defaultSystemVolume + volumeIncrease) * 10_000)
+    rangeSystem = range(startSystemVolume, endSystemVolume + 1, stepSystem)
+    if endSystemVolume > 10_000: raise Exception("Invalid volume total increase %s." % (endSystemVolume / 10_000))
+
+    systemRangeFull = []
+    if defaultSystemVolume > 0:
+        for volume in rangeSystem:
+            systemRangeFull.append((ceiling(volume/100), sigmoid(defaultSystemVolume / volume * 1_000_000 )))
+    return systemRangeFull
+
+
+def test_volume_convertion_from01to99():
+    assert volumeConversion(0.01, 0.99, 0) == [
+        (1.0, 100.0),
+        (6.0, 16.66),
+        (11.0, 9.09),
+        (16.0, 6.25),
+        (21.0, 4.76),
+        (26.0, 3.84),
+        (31.0, 3.22),
+        (36.0, 2.77),
+        (41.0, 2.43),
+        (46.0, 2.17),
+        (51.0, 1.96),
+        (56.0, 1.78),
+        (61.0, 1.63),
+        (66.0, 1.51),
+        (71.0, 1.4),
+        (76.0, 1.31),
+        (81.0, 1.23),
+        (86.0, 1.16),
+        (91.0, 1.09),
+        (96.0, 1.04),
+    ]
+
+
+def test_volume_convertion_invalid_increase():
+    with pytest.raises(Exception) as excinfo:
+        volumeConversion(0.2, 0.9, 0)
+    assert excinfo.match(r"^Invalid volume total increase 1.1.$")
+
+
+def test_volume_convertion_from20_to80():
+    assert volumeConversion(0.2, 0.8, 0) == [
+        (20.0, 100.0),
+        (25.0, 80.0),
+        (30.0, 66.66),
+        (35.0, 57.14),
+        (40.0, 50.0),
+        (45.0, 44.44),
+        (50.0, 40.0),
+        (55.0, 36.36),
+        (60.0, 33.33),
+        (65.0, 30.76),
+        (70.0, 28.57),
+        (75.0, 26.66),
+        (80.0, 25.0),
+        (85.0, 23.52),
+        (90.0, 22.22),
+        (95.0, 21.05),
+        (100.0, 20.0),
+    ]
+
+
+def test_volume_convertion_from20_factor01():
+    assert volumeConversion(0.2, 0.8, 0.1) == [
+        (20.0, 100.0),
+        (25.0, 67.42),
+        (30.0, 47.23),
+        (35.0, 33.7),
+        (40.0, 24.07),
+        (45.0, 16.89),
+        (50.0, 11.36),
+        (55.0, 6.98),
+        (60.0, 3.42),
+        (65.0, 0.48),
+        (70.0, -1.98),
+        (75.0, -4.08),
+        (80.0, -5.89),
+        (85.0, -7.47),
+        (90.0, -8.85),
+        (95.0, -10.07),
+        (100.0, -11.16),
+    ]
+
+
+@pytest.mark.skip(reason="Comment this to plot the graphs")
+def test_volume_convertion_plot_graphs():
+    numbers = volumeConversion(0.2, 0.8, 0.1)
+    numbers2 = volumeConversion(0.2, 0.8, 0.2)
+    numbers3 = volumeConversion(0.2, 0.8, 0.0)
+
+    print(f'\n{numbers}\n{numbers2}\n{numbers3}')
+
+    #  Cannot mix incompatible Qt library (version 0x50907) with this library
+    result = runpython(f"""
+import matplotlib.pyplot as pyplot
+numbers = {numbers}
+numbers2 = {numbers2}
+numbers3 = {numbers3}
+x = [item[0] for item in numbers]
+y = [item[1] for item in numbers]
+x2 = [item[0] for item in numbers2]
+y2 = [item[1] for item in numbers2]
+x3 = [item[0] for item in numbers3]
+y3 = [item[1] for item in numbers3]
+pyplot.plot(x, y)
+pyplot.plot(x2, y2)
+pyplot.plot(x3, y3)
+pyplot.xlabel('x - axis')
+pyplot.ylabel('y - axis')
+pyplot.title('My first graph!')
+pyplot.show()
+""" )
 
 
 # Copied python implementation to Start it as a daemon to not block qt from exiting!
@@ -455,7 +558,7 @@ class MainWindow(QMainWindow):
             if seconds == int(0.1 * testtime):
                 self.defaultSystemVolume = getSystemVolume()
                 threading.Thread(target=setSystemAndApplicationVolume, 
-                    args=(self.defaultSystemVolume + 0.5, self.defaultSystemVolume * 0.7, "AIMP.exe"), daemon=True).start()
+                    args=(self.defaultSystemVolume, 0.5, "AIMP.exe"), daemon=True).start()
                 # a = subprocess.Popen(r'''"D:\\User\Documents\\NirSoft\SoundVolumeView.exe" /ChangeVolume "AIMP3" -75''')
                 # b = subprocess.Popen(r'''"D:\\User\Documents\\NirSoft\SoundVolumeView.exe" /ChangeVolume "Speakers" "+50"''')
                 # ar = a.communicate()
@@ -469,7 +572,7 @@ class MainWindow(QMainWindow):
                 threading.Thread(target=speak, args=(f"{seconds} seconds",), daemon=True).start()
             if seconds == int(4.6 * testtime):
                 threading.Thread(target=setSystemAndApplicationVolume, 
-                    args=(self.defaultSystemVolume, 1.0, "AIMP.exe"), daemon=True).start()
+                    args=(self.defaultSystemVolume, 0.5, "AIMP.exe", True), daemon=True).start()
                 # a = subprocess.Popen(r'''"D:\\User\Documents\\NirSoft\SoundVolumeView.exe" /ChangeVolume "Speakers" "-50"''')
                 # b = subprocess.Popen(r'''"D:\User\Documents\NirSoft\SoundVolumeView.exe" /ChangeVolume "AIMP3" "+75"''')
                 # ar = a.communicate()
