@@ -323,16 +323,29 @@ def volumeConversion(defaultSystemVolume, volumeIncrease, factor):
         if number > 100: return 100
         return int(number * 100) / 100
 
+    if defaultSystemVolume > 1: defaultSystemVolume = 1
+    if defaultSystemVolume < 0: defaultSystemVolume = 0
+
+    increase = defaultSystemVolume + volumeIncrease
+    if increase > 1: volumeIncrease = 1 - defaultSystemVolume
+    if increase < 0: volumeIncrease = -defaultSystemVolume
+
     stepSystem = 500
     startSystemVolume = int(defaultSystemVolume * 10_000)
     endSystemVolume = int((defaultSystemVolume + volumeIncrease) * 10_000)
-    rangeSystem = range(startSystemVolume, endSystemVolume + 1, stepSystem)
-    if endSystemVolume > 10_000: raise Exception("Invalid volume total increase %s." % (endSystemVolume / 10_000))
+
+    if endSystemVolume < startSystemVolume: 
+        stepSystem *= -1
+        endSystemVolume -= 1
+    else:
+        endSystemVolume += 1
 
     systemRangeFull = []
-    if defaultSystemVolume > 0:
-        for volume in rangeSystem:
+    for volume in range(startSystemVolume, endSystemVolume, stepSystem):
+        if volume > 0:
             systemRangeFull.append((ceiling(volume/100), sigmoid(defaultSystemVolume / volume * 1_000_000 )))
+        else:
+            systemRangeFull.append((0, 100))
     return systemRangeFull
 
 
@@ -362,9 +375,47 @@ def test_volume_convertion_from01to99():
 
 
 def test_volume_convertion_invalid_increase():
-    with pytest.raises(Exception) as excinfo:
-        volumeConversion(0.2, 0.9, 0)
-    assert excinfo.match(r"^Invalid volume total increase 1.1.$")
+    assert volumeConversion(0.2, 0.9, 0) == [
+        (20.0, 100.0),
+        (25.0, 80.0),
+        (30.0, 66.66),
+        (35.0, 57.14),
+        (40.0, 50.0),
+        (45.0, 44.44),
+        (50.0, 40.0),
+        (55.0, 36.36),
+        (60.0, 33.33),
+        (65.0, 30.76),
+        (70.0, 28.57),
+        (75.0, 26.66),
+        (80.0, 25.0),
+        (85.0, 23.52),
+        (90.0, 22.22),
+        (95.0, 21.05),
+        (100.0, 20.0),
+    ]
+
+
+def test_volume_convertion_invalid_decrease():
+    assert volumeConversion(0.8, -0.9, 0) == [
+        (80.0, 100.0),
+        (75.0, 100),
+        (70.0, 100),
+        (65.0, 100),
+        (60.0, 100),
+        (55.0, 100),
+        (50.0, 100),
+        (45.0, 100),
+        (40.0, 100),
+        (35.0, 100),
+        (30.0, 100),
+        (25.0, 100),
+        (20.0, 100),
+        (15.0, 100),
+        (10.0, 100),
+        (5.0, 100),
+        (0, 100)
+    ]
 
 
 def test_volume_convertion_from20_to80():
