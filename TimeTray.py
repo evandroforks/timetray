@@ -413,13 +413,11 @@ class MainWindow(QMainWindow):
 
     def connectTray(self):
         self.runEyeRestLoop.connect( mainTray.nextEyeRestLoop )
-        self.runEyeRestLoop.emit()
 
     def clickMethod(self):
         QMessageBox.about(self, "Title", "Message")
 
     def closeEvent(self, event):
-        self.runEyeRestLoop.emit()
         event.accept()
 
     def keyPressEvent(self, event):
@@ -471,6 +469,8 @@ class MainWindow(QMainWindow):
                 # ar = a.communicate()
                 # br = b.communicate()
                 # # print(f"ar {ar}, br {br}.")
+            if seconds == int(5.6 * testtime):
+                self.runEyeRestLoop.emit()
             self.eyeRestCounterLabel.setText(str(seconds))
 
     def startEyeRest(self):
