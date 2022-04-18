@@ -691,6 +691,8 @@ class MainWindow(QMainWindow):
         QMessageBox.about(self, "Title", "Message")
 
     def closeEvent(self, event):
+        if mainTray.eyeRestTimer is None and self.incrementEyeRestCounter:
+            self.runEyeRestLoop.emit()
         event.accept()
 
     def keyPressEvent(self, event):
@@ -785,12 +787,16 @@ class QSystemTrayIconListener(QSystemTrayIcon):
 
         threading.Thread( target=self.continuallyUpdateTrayIcon, daemon=True ).start()
 
+    def showMainWindowCallback(self):
+        self.showMainWindow.emit()
+        self.eyeRestTimer = None
+
     def nextEyeRestLoop(self):
         if self.eyeRestTimer:
             self.eyeRestTimer.cancel()
 
         if mainWin.incrementEyeRestCounter:
-            self.eyeRestTimer = Timer( SHOW_WINDOW_INTERVAL, self.showMainWindow.emit )
+            self.eyeRestTimer = Timer( SHOW_WINDOW_INTERVAL, self.showMainWindowCallback )
             self.eyeRestTimer.start()
         # last_show_up = datetime.datetime.now().date()
         # while True:
