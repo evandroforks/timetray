@@ -700,6 +700,8 @@ class MainWindow(QMainWindow):
             self.close()
         if event.key() in ( QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
             self.resetEyeRest()
+            threading.Thread(target=speak, args=(f"beep",), daemon=True).start()
+            self.close()
 
     def showUp(self):
         self.show()
