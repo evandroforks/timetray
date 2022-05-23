@@ -791,6 +791,9 @@ class QSystemTrayIconListener(QSystemTrayIcon):
         self.showMainWindow.emit()
         self.eyeRestTimer = None
 
+        eyeRestTimer = Timer( 180, self.nextEyeRestLoop )
+        eyeRestTimer.start()
+
     def nextEyeRestLoop(self):
         if self.eyeRestTimer:
             self.eyeRestTimer.cancel()
