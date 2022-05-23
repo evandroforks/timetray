@@ -713,6 +713,29 @@ class MainWindow(QMainWindow):
         self.settings.setValue("pos", self.pos())
         exit()
 
+    def saveVolume(self):
+        if self.defaultSystemVolume is not None:
+            return
+
+        self.defaultSystemVolume = getSystemVolume()
+        threading.Thread(target=setSystemAndApplicationVolume,
+            args=(self.defaultSystemVolume, 0.5, "AIMP.exe"), daemon=True).start()
+        # a = subprocess.Popen(r'''"D:\\User\Documents\\NirSoft\SoundVolumeView.exe" /ChangeVolume "AIMP3" -75''')
+        # b = subprocess.Popen(r'''"D:\\User\Documents\\NirSoft\SoundVolumeView.exe" /ChangeVolume "Speakers" "+50"''')
+        # ar = a.communicate()
+        # br = b.communicate()
+        # # print(f"ar {ar}, br {br}.")
+
+    def restoreVolume(self):
+        threading.Thread(target=setSystemAndApplicationVolume,
+            args=(self.defaultSystemVolume, 0.5, "AIMP.exe", True), daemon=True).start()
+        self.defaultSystemVolume = None
+        # a = subprocess.Popen(r'''"D:\\User\Documents\\NirSoft\SoundVolumeView.exe" /ChangeVolume "Speakers" "-50"''')
+        # b = subprocess.Popen(r'''"D:\User\Documents\NirSoft\SoundVolumeView.exe" /ChangeVolume "AIMP3" "+75"''')
+        # ar = a.communicate()
+        # br = b.communicate()
+        # # print(f"ar {ar}, br {br}.")
+
     def updateTime(self):
         testtime = 10
         # testtime = 1
@@ -724,14 +747,7 @@ class MainWindow(QMainWindow):
                 filename = os.path.join(CURRENT_DIR, "Alarm06.wav")
                 QtMultimedia.QSound.play(filename)
             if seconds == int(0.1 * testtime):
-                self.defaultSystemVolume = getSystemVolume()
-                threading.Thread(target=setSystemAndApplicationVolume, 
-                    args=(self.defaultSystemVolume, 0.5, "AIMP.exe"), daemon=True).start()
-                # a = subprocess.Popen(r'''"D:\\User\Documents\\NirSoft\SoundVolumeView.exe" /ChangeVolume "AIMP3" -75''')
-                # b = subprocess.Popen(r'''"D:\\User\Documents\\NirSoft\SoundVolumeView.exe" /ChangeVolume "Speakers" "+50"''')
-                # ar = a.communicate()
-                # br = b.communicate()
-                # # print(f"ar {ar}, br {br}.")
+                self.saveVolume()
             if seconds == int(1.0 * testtime):
                 threading.Thread(target=speak, args=(f"{seconds} seconds",), daemon=True).start()
             if seconds == int(2.0 * testtime):
@@ -739,13 +755,7 @@ class MainWindow(QMainWindow):
             if seconds == int(3.0 * testtime):
                 threading.Thread(target=speak, args=(f"{seconds} seconds",), daemon=True).start()
             if seconds == int(4.6 * testtime):
-                threading.Thread(target=setSystemAndApplicationVolume, 
-                    args=(self.defaultSystemVolume, 0.5, "AIMP.exe", True), daemon=True).start()
-                # a = subprocess.Popen(r'''"D:\\User\Documents\\NirSoft\SoundVolumeView.exe" /ChangeVolume "Speakers" "-50"''')
-                # b = subprocess.Popen(r'''"D:\User\Documents\NirSoft\SoundVolumeView.exe" /ChangeVolume "AIMP3" "+75"''')
-                # ar = a.communicate()
-                # br = b.communicate()
-                # # print(f"ar {ar}, br {br}.")
+                self.restoreVolume()
             if seconds == int(5.6 * testtime):
                 self.runEyeRestLoop.emit()
             self.eyeRestCounterLabel.setText(str(seconds))
