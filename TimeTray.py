@@ -46,11 +46,15 @@ from PyQt5 import QtGui, QtCore, QtWidgets, QtMultimedia
 from PyQt5.QtCore import QSize, QSettings
 from PyQt5.QtWidgets import QMessageBox, QPushButton, QMainWindow, QLabel, QGridLayout, QWidget
 
+from debug_tools import getLogger
+log = getLogger( 127, __name__, file=str(pathlib.Path(__file__).resolve().parent / 'TimeTray.log') )
+
 g_run_tests = [False]
 CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 ALARM_TIMEOUT = 4  # * 10
-SHOW_WINDOW_INTERVAL = 1800
+AUTORESTARTINTERVAL = 180
+SHOW_WINDOW_INTERVAL = 1800 - 60
 # ALARM_TIMEOUT = 2
 # SHOW_WINDOW_INTERVAL = 2
 
@@ -697,7 +701,7 @@ class MainWindow(QMainWindow):
 
     def keyPressEvent(self, event):
         if event.key() == QtCore.Qt.Key_Escape:
-            self.close()
+            self.showMinimized()
         if event.key() in ( QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
             self.resetEyeRest()
             threading.Thread(target=speak, args=(f"beep",), daemon=True).start()
@@ -705,6 +709,7 @@ class MainWindow(QMainWindow):
 
     def showUp(self):
         self.show()
+        self.showNormal()
         self.raise_()
         self.activateWindow()
 
@@ -791,24 +796,40 @@ class QSystemTrayIconListener(QSystemTrayIcon):
         super(QSystemTrayIconListener, self).__init__( *args, **kwargs )
 
         self.eyeRestTimer = None
+        self.reinforcementTimer = None
+
         self.createTrayMenu()
         self.setTrayText()
 
         self.updateTrayIconText.connect( self.setTrayText )
-        self.showMainWindow.connect( mainWin.show )
+        self.showMainWindow.connect( mainWin.showUp )
 
         threading.Thread( target=self.continuallyUpdateTrayIcon, daemon=True ).start()
 
     def showMainWindowCallback(self):
+        log(f'eyeRestTimer {self.eyeRestTimer}, incrementEyeRestCounter {mainWin.incrementEyeRestCounter}')
+
         self.showMainWindow.emit()
         self.eyeRestTimer = None
 
-        eyeRestTimer = Timer( 180, self.nextEyeRestLoop )
-        eyeRestTimer.start()
+        if self.reinforcementTimer is not None:
+            self.reinforcementTimer.cancel()
+
+        self.reinforcementTimer = Timer( AUTORESTARTINTERVAL, self.showMainWindowReinforcementCallback )
+        self.reinforcementTimer.start()
+
+    def showMainWindowReinforcementCallback(self):
+        log(f'eyeRestTimer {self.eyeRestTimer}, incrementEyeRestCounter {mainWin.incrementEyeRestCounter}')
+
+        if self.eyeRestTimer is None and mainWin.incrementEyeRestCounter:
+            self.showMainWindowCallback()
 
     def nextEyeRestLoop(self):
-        if self.eyeRestTimer:
+        log(f'eyeRestTimer {self.eyeRestTimer}, incrementEyeRestCounter {mainWin.incrementEyeRestCounter}')
+
+        if self.eyeRestTimer is not None:
             self.eyeRestTimer.cancel()
+            self.eyeRestTimer = None
 
         if mainWin.incrementEyeRestCounter:
             self.eyeRestTimer = Timer( SHOW_WINDOW_INTERVAL, self.showMainWindowCallback )
